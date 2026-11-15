@@ -94,9 +94,18 @@ class MockModel:
         return (p1 > thr) if self.rng.random() > 0.05 else (p1 <= thr)
 
 
+PCT_RE = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s*(?:\\?%|percent)", re.I)
+
+
 def parse_p(text):
+    """Probability from 'Final answer: NN%'; fallback = last percentage in the final 150 chars."""
     m = FINAL_RE.findall(text or "")
-    return float(m[-1]) / 100 if m else None
+    if m:
+        return float(m[-1]) / 100
+    tail = PCT_RE.findall((text or "")[-150:])
+    if tail and 0 <= float(tail[-1]) <= 100:
+        return float(tail[-1]) / 100
+    return None
 
 
 def bet_prompt(hyp, thr):
