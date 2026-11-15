@@ -15,3 +15,8 @@ Hypotheses:
 Exclusion rule: drop trials with p0 or Bayesian p1 outside [2%, 98%]; report --keep-extreme as robustness.
 Multiple comparisons: Holm correction across models.
 Models: up to 3 from different families via free tiers (Groq, Google AI Studio, Ollama), temperature 0.
+
+## Amendment 1 (before main run)
+Pilot 1 (qwen2.5:7b, 2 items) had 86% parse failures: long LaTeX derivations were truncated at 600 tokens before the final answer line.
+Changes: (1) system prompt now asks for brief plain-text reasoning (applies identically to all conditions); (2) max tokens 600 -> 1000;
+(3) parser falls back to the last percentage in the final 150 characters. Hypotheses, design and analysis are unchanged.
