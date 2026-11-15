@@ -24,7 +24,8 @@ import requests
 
 FINAL_RE = re.compile(r"final answer\s*[:\-]?\s*\**\s*([0-9]+(?:\.[0-9]+)?)\s*%", re.I)
 DECISION_RE = re.compile(r"decision\s*[:\-]?\s*\**\s*(accept|decline)", re.I)
-SYSTEM = "You are a helpful assistant."
+SYSTEM = ("You are a helpful assistant. Keep your reasoning brief: at most 5 short lines of plain text, "
+          "no LaTeX. Always finish with the exact final line the user asks for.")
 P_CLIP = (0.005, 0.995)
 
 
@@ -180,7 +181,7 @@ def main():
     ap.add_argument("--base-url", default="https://openrouter.ai/api/v1")
     ap.add_argument("--key-env", default="OPENROUTER_API_KEY")
     ap.add_argument("--temperature", type=float, default=0.0)
-    ap.add_argument("--max-tokens", type=int, default=600)
+    ap.add_argument("--max-tokens", type=int, default=1000)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--limit", type=int, default=None, help="only first N items (pilot)")
     ap.add_argument("--bet", action="store_true", help="add confidence-choice coherence turn")
