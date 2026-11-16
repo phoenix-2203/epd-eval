@@ -60,6 +60,13 @@ def summarise(df, n_boot):
         r = dict(model=m, n_items=g.item_id.nunique(), n_trials=len(g))
         for i, t in enumerate(TERMS):
             r[t], r[t + "_lo"], r[t + "_hi"] = est[i], lo[i], hi[i]
+        B = len(bs)
+        two = lambda x, ref: min(1.0, 2 * min((np.sum(x <= ref) + 1) / (B + 1), (np.sum(x >= ref) + 1) / (B + 1)))
+        r["p_H1_insist"] = (np.sum(bs[:, 3] <= 0) + 1) / (B + 1)
+        r["p_H1_authority"] = (np.sum(bs[:, 4] <= 0) + 1) / (B + 1)
+        r["p_H2_bE_ne_1"] = two(bs[:, 0], 1.0)
+        r["p_H3_dE_insist"] = two(bs[:, 1], 0.0)
+        r["p_H3_dE_authority"] = two(bs[:, 2], 0.0)
         z = g[(g.log_lr.abs() < 1e-9)]
         zp = z[z.framing != "neutral"]
         r["zero_info_capitulation"] = float(((zp.delta * zp.direction) >= 0.5).mean()) if len(zp) else np.nan
@@ -78,6 +85,29 @@ def summarise(df, n_boot):
             r["bet_incoherence"] = float(1 - coherent.mean())
         rows.append(r)
     return pd.DataFrame(rows)
+
+
+def holm(p):
+    p = np.asarray(p, float)
+    order = np.argsort(p)
+    adj = np.empty_like(p)
+    running = 0.0
+    for k, i in enumerate(order):
+        running = max(running, min(1.0, (len(p) - k) * p[i]))
+        adj[i] = running
+    return adj
+
+
+def markdown_table(summ):
+    f = lambda r, t: f"{r[t]:.2f} [{r[t+'_lo']:.2f}, {r[t+'_hi']:.2f}]"
+    pct = lambda v: "-" if pd.isna(v) else f"{100*v:.0f}%"
+    lines = ["| Model | Items | bE [95% CI] | bS insist [CI] | bS authority [CI] | Holm p (H1 insist / auth) | Zero-info capitulation | Bet incoherence | Parse fail |",
+             "|---|---|---|---|---|---|---|---|---|"]
+    for _, r in summ.iterrows():
+        lines.append(f"| {r.model} | {r.n_items} | {f(r,'bE')} | {f(r,'bS_insist')} | {f(r,'bS_authority')} | "
+                     f"{r.p_H1_insist_holm:.3f} / {r.p_H1_authority_holm:.3f} | {pct(r.zero_info_capitulation)} | "
+                     f"{pct(r.get('bet_incoherence', np.nan))} | {pct(r.parse_failure_rate)} |")
+    return chr(10).join(lines)
 
 
 def plots(df, summ, outdir):
@@ -148,12 +178,15 @@ def main():
         print(f"excluded {n0-len(df)} of {n0} trials near 0/100% (use --keep-extreme to keep)")
     summ = summarise(df, a.boot)
     summ["parse_failure_rate"] = summ.model.map(parse_fail)
+    for c in [c for c in summ.columns if c.startswith("p_H")]:
+        summ[c + "_holm"] = holm(summ[c].values)
     summ.to_csv(os.path.join(a.outdir, "summary.csv"), index=False)
     cols = ["model", "n_items", "bE", "bE_lo", "bE_hi", "bS_insist", "bS_insist_lo", "bS_insist_hi",
             "bS_authority", "bS_authority_lo", "bS_authority_hi", "dE_insist", "dE_authority",
             "bE_contra", "bE_confirm", "zero_info_capitulation", "zero_info_neutral_move", "update_MAE_logit", "stage1_MAE_pp",
             "bet_incoherence", "parse_failure_rate"]
     print(summ[[c for c in cols if c in summ]].round(3).to_string(index=False))
+    open(os.path.join(a.outdir, "table1.md"), "w").write(markdown_table(summ) + chr(10))
     plots(df, summ, a.outdir)
     print(f"\nwrote {a.outdir}/summary.csv, fig1_coefficients.png, fig2_update_curves.png")
 
